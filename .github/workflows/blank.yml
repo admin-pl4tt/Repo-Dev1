@@ -12,11 +12,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      # Install Power Platform CLI actions
+      # Install Power Platform CLI
       - name: Install Power Platform CLI
         uses: microsoft/powerplatform-actions/actions-install@v1
 
-      # Export unmanaged from ALM-DEV1
+      # Create working folders
+      - name: Create output folders
+        run: |
+          mkdir out
+          mkdir src
+
+      # Export unmanaged solution from DEV1
       - name: Export Unmanaged
         uses: microsoft/powerplatform-actions/export-solution@v1
         with:
@@ -24,19 +30,28 @@ jobs:
           app-id: ${{ secrets.APP_ID }}
           client-secret: ${{ secrets.CLIENT_SECRET }}
           tenant-id: ${{ secrets.TENANT_ID }}
-          solution-name: Dev1Solution
+          solution-name: DEV1Solution
           managed: false
-          solution-output-file: ./Dev1_unmanaged.zip
+          solution-output-file: DEV1.zip
+          working-directory: out
+
+      # Unpack unmanaged to source folder
+      - name: Unpack Solution
+        uses: microsoft/powerplatform-actions/unpack-solution@v1
+        with:
+          solution-file: out/DEV1.zip
+          solution-folder: src/DEV1Solution
+          solution-type: Unmanaged
 
       # Pack managed solution
       - name: Pack Managed
         uses: microsoft/powerplatform-actions/pack-solution@v1
         with:
-          solution-file: ./Dev1_unmanaged.zip
+          solution-folder: src/DEV1Solution
           solution-type: Managed
-          solution-output-file: ./Dev1_managed.zip
+          solution-file: out/DEV1_managed.zip
 
-      # Deploy DEV1 managed to TEST
+      # Deploy managed DEV1 to TEST
       - name: Deploy to TEST
         uses: microsoft/powerplatform-actions/import-solution@v1
         with:
@@ -44,6 +59,6 @@ jobs:
           app-id: ${{ secrets.APP_ID }}
           client-secret: ${{ secrets.CLIENT_SECRET }}
           tenant-id: ${{ secrets.TENANT_ID }}
-          solution-file: ./Dev1_managed.zip
+          solution-file: out/DEV1_managed.zip
           publish-changes: true
           force-overwrite: true
