@@ -17,7 +17,7 @@ jobs:
         uses: microsoft/powerplatform-actions/actions-install@v1
 
       # Create working folders
-      - name: Create output folders
+      - name: Create working folders
         run: |
           mkdir out
           mkdir src
@@ -32,26 +32,31 @@ jobs:
           tenant-id: ${{ secrets.TENANT_ID }}
           solution-name: DEV1Solution
           managed: false
-          solution-output-file: DEV1.zip
+          solution-output-file: DEV1_unmanaged.zip
           working-directory: out
 
-      # Unpack unmanaged to source folder
+      # Unpack unmanaged
       - name: Unpack Solution
         uses: microsoft/powerplatform-actions/unpack-solution@v1
         with:
-          solution-file: out/DEV1.zip
+          solution-file: out/DEV1_unmanaged.zip
           solution-folder: src/DEV1Solution
           solution-type: Unmanaged
 
-      # Pack managed solution
-      - name: Pack Managed
-        uses: microsoft/powerplatform-actions/pack-solution@v1
+      # Export managed solution from DEV1
+      - name: Export Managed
+        uses: microsoft/powerplatform-actions/export-solution@v1
         with:
-          solution-folder: src/DEV1Solution
-          solution-type: Managed
-          solution-file: out/DEV1_managed.zip
+          environment-url: ${{ secrets.DEV1_ENV_URL }}
+          app-id: ${{ secrets.APP_ID }}
+          client-secret: ${{ secrets.CLIENT_SECRET }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          solution-name: DEV1Solution
+          managed: true
+          solution-output-file: DEV1_managed.zip
+          working-directory: out
 
-      # Deploy managed DEV1 to TEST
+      # Deploy DEV1 to TEST
       - name: Deploy to TEST
         uses: microsoft/powerplatform-actions/import-solution@v1
         with:
