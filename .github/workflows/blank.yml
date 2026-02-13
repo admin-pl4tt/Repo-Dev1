@@ -1,0 +1,49 @@
+name: DEV1 - Build and Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-deploy:
+    runs-on: windows-latest
+
+    steps:
+      # Checkout repository
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # Install Power Platform CLI actions
+      - name: Install Power Platform CLI
+        uses: microsoft/powerplatform-actions/actions-install@v1
+
+      # Export unmanaged from ALM-DEV1
+      - name: Export Unmanaged
+        uses: microsoft/powerplatform-actions/export-solution@v1
+        with:
+          environment-url: ${{ secrets.DEV1_ENV_URL }}
+          app-id: ${{ secrets.APP_ID }}
+          client-secret: ${{ secrets.CLIENT_SECRET }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          solution-name: Dev1Solution
+          managed: false
+          solution-output-file: ./Dev1_unmanaged.zip
+
+      # Pack managed solution
+      - name: Pack Managed
+        uses: microsoft/powerplatform-actions/pack-solution@v1
+        with:
+          solution-file: ./Dev1_unmanaged.zip
+          solution-type: Managed
+          solution-output-file: ./Dev1_managed.zip
+
+      # Deploy DEV1 managed to TEST
+      - name: Deploy to TEST
+        uses: microsoft/powerplatform-actions/import-solution@v1
+        with:
+          environment-url: ${{ secrets.TEST_ENV_URL }}
+          app-id: ${{ secrets.APP_ID }}
+          client-secret: ${{ secrets.CLIENT_SECRET }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          solution-file: ./Dev1_managed.zip
+          publish-changes: true
+          force-overwrite: true
