@@ -1,0 +1,132 @@
+name: DEV1 - Build (Deploy Optional)
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Deploy to TEST? (true/false)"
+        required: true
+        default: "false"
+
+permissions:
+  contents: write
+
+env:
+  DEV1_ENV_URL: ${{ secrets.DEV1_ENV_URL }}
+  TEST_ENV_URL: ${{ secrets.TEST_ENV_URL }}
+  APP_ID: ${{ secrets.APP_ID }}
+  CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+  TENANT_ID: ${{ secrets.TENANT_ID }}
+  SOLUTION_NAME: DEV1Solution   # MUST be UNIQUE NAME
+
+jobs:
+  dev1-build:
+    runs-on: windows-latest
+
+    steps:
+      # ----------------------------
+      # Checkout
+      # ----------------------------
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: true
+
+      - name: Install Power Platform CLI
+        uses: microsoft/powerplatform-actions/actions-install@v1
+
+      # ----------------------------
+      # Validate Authentication
+      # ----------------------------
+      - name: Validate Authentication
+        uses: microsoft/powerplatform-actions/who-am-i@v1
+        with:
+          environment-url: ${{ env.DEV1_ENV_URL }}
+          app-id: ${{ env.APP_ID }}
+          client-secret: ${{ env.CLIENT_SECRET }}
+          tenant-id: ${{ env.TENANT_ID }}
+
+      # ----------------------------
+      # Safe folder creation
+      # ----------------------------
+      - name: Create working folder
+        run: |
+          if (!(Test-Path out)) { New-Item -ItemType Directory -Path out }
+        shell: pwsh
+
+      # ----------------------------
+      # Auto Version Bump
+      # ----------------------------
+      - name: Set Solution Version
+        uses: microsoft/powerplatform-actions/set-online-solution-version@v1
+        with:
+          environment-url: ${{ env.DEV1_ENV_URL }}
+          app-id: ${{ env.APP_ID }}
+          client-secret: ${{ env.CLIENT_SECRET }}
+          tenant-id: ${{ env.TENANT_ID }}
+          name: ${{ env.SOLUTION_NAME }}
+          version: 1.0.${{ github.run_number }}
+
+      # ----------------------------
+      # Export Unmanaged
+      # ----------------------------
+      - name: Export DEV1 Unmanaged
+        uses: microsoft/powerplatform-actions/export-solution@v1
+        with:
+          environment-url: ${{ env.DEV1_ENV_URL }}
+          app-id: ${{ env.APP_ID }}
+          client-secret: ${{ env.CLIENT_SECRET }}
+          tenant-id: ${{ env.TENANT_ID }}
+          solution-name: ${{ env.SOLUTION_NAME }}
+          managed: false
+          solution-output-file: DEV1_unmanaged.zip
+          working-directory: out
+
+      - name: Unpack DEV1
+        uses: microsoft/powerplatform-actions/unpack-solution@v1
+        with:
+          solution-file: out/DEV1_unmanaged.zip
+          solution-folder: src/DEV1Solution
+          solution-type: Unmanaged
+          overwrite-files: true
+
+      # ----------------------------
+      # Commit to Source Control
+      # ----------------------------
+      - name: Commit Unpacked DEV1
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add src
+          git commit -m "Update DEV1 source from DEV1 environment" || echo "No changes detected"
+          git push
+
+      # ----------------------------
+      # Export Managed
+      # ----------------------------
+      - name: Export DEV1 Managed
+        uses: microsoft/powerplatform-actions/export-solution@v1
+        with:
+          environment-url: ${{ env.DEV1_ENV_URL }}
+          app-id: ${{ env.APP_ID }}
+          client-secret: ${{ env.CLIENT_SECRET }}
+          tenant-id: ${{ env.TENANT_ID }}
+          solution-name: ${{ env.SOLUTION_NAME }}
+          managed: true
+          solution-output-file: DEV1_managed.zip
+          working-directory: out
+
+      # ----------------------------
+      # Optional Promotion to TEST
+      # ----------------------------
+      - name: Deploy DEV1 to TEST
+        if: ${{ github.event.inputs.deploy == 'true' }}
+        uses: microsoft/powerplatform-actions/import-solution@v1
+        with:
+          environment-url: ${{ env.TEST_ENV_URL }}
+          app-id: ${{ env.APP_ID }}
+          client-secret: ${{ env.CLIENT_SECRET }}
+          tenant-id: ${{ env.TENANT_ID }}
+          solution-file: out/DEV1_managed.zip
+          publish-changes: true
+          force-overwrite: true
